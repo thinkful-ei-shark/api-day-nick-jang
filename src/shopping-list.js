@@ -1,4 +1,5 @@
 import $ from 'jquery';
+import api from './api';
 
 import store from './store';
 
@@ -39,7 +40,12 @@ const render = function () {
   }
 
   // render the shopping list in the DOM
-  const shoppingListItemsString = generateShoppingItemsString(items);
+  let shoppingListItemsString = generateShoppingItemsString(items);
+
+  if (store.error.code) {
+    shoppingListItemsString = `<h3>Error: ${store.error.message}</h3>` + shoppingListItemsString;
+    store.resetError();
+  }
 
   // insert that HTML into the DOM
   $('.js-shopping-list').html(shoppingListItemsString);
@@ -50,8 +56,12 @@ const handleNewItemSubmit = function () {
     event.preventDefault();
     const newItemName = $('.js-shopping-list-entry').val();
     $('.js-shopping-list-entry').val('');
-    store.addItem(newItemName);
-    render();
+    api.createItem(newItemName)
+      .then(data => {
+        if (store.error.code) return render();
+        store.addItem(data);
+        render();
+      });
   });
 };
 
@@ -67,9 +77,13 @@ const handleDeleteItemClicked = function () {
     // get the index of the item in store.items
     const id = getItemIdFromElement(event.currentTarget);
     // delete the item
-    store.findAndDelete(id);
+    api.deleteItem(id)
+      .then(data => {
+        if (store.error.code) return render();
+        store.findAndDelete(id);
+        render();
+      });
     // render the updated shopping list
-    render();
   });
 };
 
@@ -78,16 +92,30 @@ const handleEditShoppingItemSubmit = function () {
     event.preventDefault();
     const id = getItemIdFromElement(event.currentTarget);
     const itemName = $(event.currentTarget).find('.shopping-item').val();
-    store.findAndUpdateName(id, itemName);
-    render();
+    let newName = { name: itemName };
+    api.updateItem(id, newName)
+      .then(() => {
+        if (store.error.code) return render();
+        store.findAndUpdate(id, newName);
+        render();
+      });
   });
 };
 
 const handleItemCheckClicked = function () {
   $('.js-shopping-list').on('click', '.js-item-toggle', event => {
     const id = getItemIdFromElement(event.currentTarget);
-    store.findAndToggleChecked(id);
-    render();
+    let item = store.findById(id);
+    console.log(id);
+    console.log(item);
+    console.log(store.items);
+    let newCheckedProperty = { checked: !item.checked };
+    api.updateItem(id, newCheckedProperty)
+      .then(() => {
+        if (store.error.code) return render();
+        store.findAndUpdate(id, newCheckedProperty);
+        render();
+      });
   });
 };
 
